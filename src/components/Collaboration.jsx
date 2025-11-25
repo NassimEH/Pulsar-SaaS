@@ -10,7 +10,7 @@ const Collaboration = () => {
       <div className="container lg:flex">
         <div className="max-w-[25rem]">
           <h2 className="h2 mb-4 md:mb-8">
-            AI Chat App for seamless collaboration
+            Studio audio IA pour une collaboration fluide
           </h2>
 
           <ul className="max-w-[22rem] mb-10 md:mb-14">
@@ -27,7 +27,7 @@ const Collaboration = () => {
             ))}
           </ul>
 
-          <Button>Try it now</Button>
+          <Button>Essayer maintenant</Button>
         </div>
 
         <div className="lg:ml-auto xl:w-[38rem] mt-4">
@@ -53,14 +53,12 @@ const Collaboration = () => {
               {collabApps.map((app, index) => (
                 <li
                   key={app.id}
-                  className={`absolute top-0 left-1/2 h-1/2 -ml-[1.6rem] origin-bottom rotate-${
-                    index * 45
-                  }`}
+                  className={`absolute top-0 left-1/2 h-1/2 -ml-[1.6rem] origin-bottom rotate-${index * 45
+                    }`}
                 >
                   <div
-                    className={`relative -top-[1.6rem] flex w-[3.2rem] h-[3.2rem] bg-n-7 border border-n-1/15 rounded-xl -rotate-${
-                      index * 45
-                    }`}
+                    className={`relative -top-[1.6rem] flex w-[3.2rem] h-[3.2rem] bg-n-7 border border-n-1/15 rounded-xl -rotate-${index * 45
+                      }`}
                   >
                     <img
                       className="m-auto"
