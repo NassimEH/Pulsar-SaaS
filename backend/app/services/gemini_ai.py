@@ -85,32 +85,106 @@ class GeminiAIService:
                 print(f"Impossible de lister les modèles: {str(list_error)}. Utilisation des modèles par défaut.")
                 available_models = ['gemini-2.5-flash', 'gemini-2.0-flash-exp', 'gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-pro']
             
-            # Construire le prompt
+            # Construire le prompt avec toutes les métriques
             prompt = f"""Tu es un ingénieur du son professionnel et critique musical exigeant. Analyse ces données audio techniques :
 
-BPM: {features.get('bpm', 'N/A')}
-Tonalité: {features.get('key', 'N/A')}
-Niveau RMS: {features.get('rms_level', 'N/A')}
-Centroïde spectral: {features.get('spectral_centroid', 'N/A')} Hz
-Bande passante spectrale: {features.get('spectral_bandwidth', 'N/A')} Hz
-Taux de passage par zéro: {features.get('zero_crossing_rate', 'N/A')}
+**MÉTRIQUES RYTHMIQUES & HARMONIQUES :**
+- BPM: {features.get('bpm', 'N/A')}
+- Stabilité du tempo: {features.get('tempo_stability', 'N/A')} (1.0 = parfaitement stable)
+- Tonalité: {features.get('key', 'N/A')}
 
-CONSIGNES :
+**MÉTRIQUES DE NIVEAU & DYNAMIQUE :**
+- Niveau RMS: {features.get('rms_level', 'N/A')} (linéaire) / {features.get('rms_level_db', 'N/A')} dB
+- Niveau Peak: {features.get('peak_level_db', 'N/A')} dB
+- Crest Factor: {features.get('crest_factor', 'N/A')} ({features.get('crest_factor_db', 'N/A')} dB) - Ratio peak/RMS (indicateur de dynamique)
+- Dynamic Range: {features.get('dynamic_range_db', 'N/A')} dB (différence peak-RMS)
+
+**MÉTRIQUES SPECTRALES :**
+- Centroïde spectral: {features.get('spectral_centroid', 'N/A')} Hz (brillance moyenne)
+- Bande passante spectrale: {features.get('spectral_bandwidth', 'N/A')} Hz
+- Spectral Rolloff: {features.get('spectral_rolloff', 'N/A')} Hz (fréquence où 85% de l'énergie est concentrée)
+- Spectral Contrast: {features.get('spectral_contrast', 'N/A')} (contraste fréquentiel)
+- Spectral Flatness: {features.get('spectral_flatness', 'N/A')} (0=tonal, 1=bruité)
+- Taux de passage par zéro: {features.get('zero_crossing_rate', 'N/A')}
+
+**ANALYSE PAR BANDES FRÉQUENTIELLES (pourcentages d'énergie) :**
+- Basses (20-250 Hz): {features.get('bass_energy_pct', 'N/A')}%
+- Bas-médiums (250-500 Hz): {features.get('low_mid_energy_pct', 'N/A')}%
+- Médiums (500-2000 Hz): {features.get('mid_energy_pct', 'N/A')}%
+- Hauts-médiums (2000-4000 Hz): {features.get('high_mid_energy_pct', 'N/A')}%
+- Aigus (4000-20000 Hz): {features.get('treble_energy_pct', 'N/A')}%
+
+**ANALYSE HARMONIQUE/PERCUSSIVE :**
+- Ratio harmonique: {features.get('harmonic_ratio', 'N/A')} (1.0 = 100% harmonique)
+- Ratio percussif: {features.get('percussive_ratio', 'N/A')} (1.0 = 100% percussif)
+
+**INFORMATIONS STÉRÉO :**
+- Format: {'Stéréo' if features.get('is_stereo', False) else 'Mono'}
+- Largeur stéréo: {features.get('stereo_width', 'N/A')} (corrélation L/R, -1 à 1, proche de 1 = mono, proche de 0 = large)
+
+**CONSIGNES D'ANALYSE :**
 - Sois TRÈS critique et honnête
-- Identifie les problèmes de mixage, de mastering, d'équilibre fréquentiel
-- Donne des recommandations PRÉCISES et techniques
-- Compare aux standards professionnels de l'industrie musicale
+- **VULGARISATION IMPORTANTE** : Explique les concepts techniques de façon courante et accessible, tout en restant rigoureux et précis. Utilise des analogies et des termes compréhensibles pour un musicien ou producteur non-expert, mais garde la précision technique nécessaire.
+- Utilise TOUTES les métriques fournies pour une analyse complète
+- Identifie les problèmes de mixage, de mastering, d'équilibre fréquentiel, de dynamique
+- Analyse l'équilibre fréquentiel en utilisant les pourcentages par bandes
+- Évalue la dynamique avec le Crest Factor et Dynamic Range
+- Vérifie la stabilité rythmique avec la stabilité du tempo
+- Analyse la largeur stéréo si applicable
+- Donne des recommandations PRÉCISES et techniques basées sur les valeurs réelles
+- Compare aux standards professionnels de l'industrie musicale :
+  * RMS cible: -9 à -6 dBFS pour streaming moderne
+  * Crest Factor: 8-12 dB pour musique dynamique, 4-6 dB pour musique compressée
+  * Dynamic Range: >6 dB minimum, idéalement 10-14 dB
+  * Équilibre fréquentiel: distribution équilibrée entre les bandes
 - Mentionne les points forts ET les faiblesses
-- Utilise un ton professionnel mais direct
-- Sois concis (maximum 300 mots)
+- Utilise un ton professionnel mais accessible, avec des explications claires
+- Sois concis mais complet (maximum 400 mots)
+- **Exemple de vulgarisation** : Au lieu de dire "Le centroïde spectral est bas", dis "Le mix manque de brillance et d'éclat dans les aigus, ce qui le rend un peu terne" tout en mentionnant la valeur technique
 
-Format ta réponse en sections claires :
-1. Vue d'ensemble
-2. Points forts
-3. Points à améliorer
-4. Recommandations techniques
+**FORMAT DE RÉPONSE (en Markdown) :**
+Utilise le format Markdown suivant avec une hiérarchie claire :
 
-Réponds uniquement avec le contenu de l'analyse, sans préambule."""
+# Vue d'ensemble
+[Texte de la vue d'ensemble]
+
+## Points forts
+[Description des points forts avec **gras** pour les éléments importants]
+
+## Points à améliorer
+### [Sous-section 1]
+[Description détaillée avec **gras** pour les problèmes critiques]
+
+### [Sous-section 2]
+[Description détaillée]
+
+## Recommandations techniques
+### Niveaux & Mastering
+- [Analyser RMS, Peak, Crest Factor, Dynamic Range]
+- [Recommandations pour atteindre les standards de loudness]
+- [Recommandations de compression/limitation si nécessaire]
+
+### Équilibrage fréquentiel
+- [Analyser la distribution par bandes (basses, médiums, aigus)]
+- [Identifier les déséquilibres avec les pourcentages fournis]
+- [Recommandations d'égalisation précises par bande]
+
+### Dynamique & Compression
+- [Analyser le Crest Factor et Dynamic Range]
+- [Recommandations pour préserver ou ajuster la dynamique]
+
+### Stéréo & Espacement
+- [Si stéréo: analyser la largeur et donner des recommandations]
+- [Recommandations de traitement stéréo si nécessaire]
+
+### Mixage (si nécessaire)
+- [Recommandations générales de mixage basées sur toutes les métriques]
+
+**IMPORTANT :** 
+- Utilise **gras** pour les termes techniques, valeurs importantes, et concepts clés
+- Référence les valeurs exactes des métriques dans ton analyse
+- Structure clairement avec des titres de niveaux appropriés
+- Sois spécifique avec les valeurs numériques (ex: "Crest Factor de {crest_factor} dB indique...")"""
 
             # Utiliser le premier modèle disponible (prioriser les modèles récents)
             # Ordre de priorité : flash (rapide) > pro (puissant) > autres

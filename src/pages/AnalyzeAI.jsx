@@ -5,6 +5,7 @@ import Footer from "../components/Footer";
 import Section from "../components/Section";
 import Heading from "../components/Heading";
 import { Gradient } from "../components/design/Services";
+import MarkdownReport from "../components/MarkdownReport";
 
 const AnalyzeAI = () => {
     const navigate = useNavigate();
@@ -175,9 +176,9 @@ Vérifiez que :
                                     <p className="text-n-4 text-sm mt-4">L'IA examine votre audio en détail</p>
                                 </div>
                             ) : (
-                                <div className="prose prose-invert max-w-none">
-                                    <div className="p-6 bg-n-7/30 rounded-xl border border-n-6/30 whitespace-pre-wrap text-n-2 leading-relaxed">
-                                        {aiReport}
+                                <div className="markdown-container">
+                                    <div className="p-8 bg-gradient-to-br from-n-7/40 to-n-8/40 rounded-xl border border-n-6/30 backdrop-blur-sm">
+                                        <MarkdownReport content={aiReport} />
                                     </div>
                                 </div>
                             )}
