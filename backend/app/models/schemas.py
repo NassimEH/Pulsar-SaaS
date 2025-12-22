@@ -13,3 +13,10 @@ class ProcessRequest(BaseModel):
 
 class ProcessResponse(BaseModel):
     download_url: str
+
+class AIAnalysisRequest(BaseModel):
+    features: dict
+
+class AIAnalysisResponse(BaseModel):
+    report: str
+    source: str = "gemini-ai"

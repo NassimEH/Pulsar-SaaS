@@ -16,6 +16,14 @@ const Studio = () => {
         if (!selectedFile) return;
         setFile(selectedFile);
 
+        // Validate file size (50MB max)
+        const maxSize = 50 * 1024 * 1024; // 50MB
+        if (selectedFile.size > maxSize) {
+            alert("Le fichier est trop volumineux. Taille maximum : 50MB");
+            e.target.value = ""; // Reset input
+            return;
+        }
+
         const formData = new FormData();
         formData.append("file", selectedFile);
 
@@ -27,11 +35,16 @@ const Studio = () => {
             });
 
             if (!uploadResponse.ok) {
-                throw new Error("Upload failed");
+                const errorData = await uploadResponse.json().catch(() => ({ detail: "Upload failed" }));
+                throw new Error(errorData.detail || `Upload failed with status ${uploadResponse.status}`);
             }
 
             const uploadData = await uploadResponse.json();
 
+            // Reset loading before navigation
+            setLoading(false);
+
+            // Navigate to process page
             navigate("/process", {
                 state: {
                     file: selectedFile,
@@ -40,9 +53,12 @@ const Studio = () => {
             });
 
         } catch (error) {
-            console.error("Error:", error);
-            alert("Erreur lors de l'upload. Vérifiez que le backend est démarré.");
+            console.error("Upload error:", error);
+            alert(`Erreur lors de l'upload: ${error.message}\n\nVérifiez que le backend est démarré sur http://localhost:8000`);
             setLoading(false);
+            // Reset file input
+            e.target.value = "";
+            setFile(null);
         }
     };
 
@@ -70,7 +86,7 @@ const Studio = () => {
                                     <div className="relative">
                                         <input
                                             type="file"
-                                            accept=".mp3,.wav,.ogg"
+                                            accept=".mp3,.wav,.ogg,.flac"
                                             onChange={handleUpload}
                                             id="file-upload"
                                             className="hidden"
@@ -93,7 +109,7 @@ const Studio = () => {
                                                     <p className="mb-2 text-sm text-n-3">
                                                         <span className="font-semibold">Cliquez pour uploader</span> ou glissez-déposez
                                                     </p>
-                                                    <p className="text-xs text-n-4">MP3, WAV ou OGG (MAX. 50MB)</p>
+                                                    <p className="text-xs text-n-4">MP3, WAV, OGG ou FLAC (MAX. 50MB)</p>
                                                 </div>
                                             )}
                                         </label>

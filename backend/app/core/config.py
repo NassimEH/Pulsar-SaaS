@@ -1,5 +1,11 @@
 import os
 from pathlib import Path
+from dotenv import load_dotenv
+
+# Charger les variables d'environnement depuis le fichier .env
+# Le fichier .env doit être dans le dossier backend/
+env_path = Path(__file__).resolve().parent.parent.parent / ".env"
+load_dotenv(dotenv_path=env_path)
 
 class Settings:
     PROJECT_NAME: str = "Brainwave Audio API"
@@ -15,6 +21,10 @@ class Settings:
     
     ALLOWED_EXTENSIONS: set = {"mp3", "wav", "ogg", "flac"}
     MAX_UPLOAD_SIZE: int = 50 * 1024 * 1024  # 50 MB
+    
+    # Gemini AI Configuration
+    # Charge depuis .env ou variable d'environnement système
+    GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
 
     def __init__(self):
         # Ensure directories exist

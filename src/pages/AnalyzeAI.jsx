@@ -29,47 +29,55 @@ const AnalyzeAI = () => {
         setLoading(true);
         setProgress(0);
 
-        const progressInterval = setInterval(() => {
-            setProgress(prev => {
-                if (prev >= 90) {
-                    clearInterval(progressInterval);
-                    return 90;
-                }
-                return prev + 10;
-            });
-        }, 300);
+        let progressInterval = null;
 
         try {
-            const prompt = `Tu es un ingénieur du son professionnel et critique musical exigeant. Analyse ces données audio techniques :
+            progressInterval = setInterval(() => {
+                setProgress(prev => {
+                    if (prev >= 90) {
+                        return 90;
+                    }
+                    return prev + 10;
+                });
+            }, 300);
 
-BPM: ${features.bpm}
-Tonalité: ${features.key}
-Niveau RMS: ${features.rms_level}
-Centroïde spectral: ${features.spectral_centroid} Hz
+            const response = await fetch("http://localhost:8000/api/analyze-ai", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                    features: features
+                })
+            });
 
-CONSIGNES :
-- Sois TRÈS critique et honnête
-- Identifie les problèmes de mixage, de mastering, d'équilibre fréquentiel
-- Donne des recommandations PRÉCISES et techniques
-- Compare aux standards professionnels de l'industrie musicale
-- Mentionne les points forts ET les faiblesses
-- Utilise un ton professionnel mais direct
-- Sois concis (maximum 300 mots)
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({ detail: "Erreur inconnue" }));
+                throw new Error(errorData.detail || `Erreur HTTP ${response.status}`);
+            }
 
-Format ta réponse en sections claires :
-1. Vue d'ensemble
-2. Points forts
-3. Points à améliorer
-4. Recommandations techniques`;
-
-            const resp = await window.puter.ai.chat(prompt);
-
-            clearInterval(progressInterval);
+            const data = await response.json();
+            
+            // Nettoyer l'intervalle
+            if (progressInterval) {
+                clearInterval(progressInterval);
+                progressInterval = null;
+            }
+            
             setProgress(100);
-            setAiReport(resp.content || resp.message || JSON.stringify(resp));
+            
+            // S'assurer que report est une string
+            const report = typeof data.report === 'string' ? data.report : String(data.report || "Aucune analyse disponible");
+            setAiReport(report);
         } catch (error) {
-            console.error("Puter AI Error:", error);
-            clearInterval(progressInterval);
+            console.error("AI Analysis Error:", error);
+            
+            // Nettoyer l'intervalle en cas d'erreur
+            if (progressInterval) {
+                clearInterval(progressInterval);
+                progressInterval = null;
+            }
+            
             setProgress(100);
             setAiReport(`Erreur lors de la génération de l'analyse IA.
 
@@ -79,7 +87,11 @@ Détails techniques analysés :
 - Niveau RMS : ${features.rms_level.toFixed(2)}
 - Centroïde spectral : ${Math.round(features.spectral_centroid)} Hz
 
-L'analyse IA nécessite une connexion à Puter.js. Veuillez vérifier que le service est disponible.`);
+Erreur : ${error.message}
+
+Vérifiez que :
+1. Le backend est démarré sur http://localhost:8000
+2. La clé API Gemini est configurée (GEMINI_API_KEY)`);
         } finally {
             setLoading(false);
         }

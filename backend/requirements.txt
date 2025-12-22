@@ -7,3 +7,8 @@ numpy==1.26.3
 scipy==1.12.0
 soundfile==0.12.1
 aiofiles==23.2.1
+# Nouveau package recommandé (supprime le warning FutureWarning)
+google-genai>=1.0.0
+# Ancien package (fallback si le nouveau n'est pas disponible)
+# google-generativeai>=0.8.0
+python-dotenv==1.0.0

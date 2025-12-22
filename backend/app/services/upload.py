@@ -1,4 +1,3 @@
-import shutil
 import uuid
 from pathlib import Path
 from fastapi import UploadFile, HTTPException, status
@@ -26,8 +25,21 @@ class UploadService:
         
         # Save file
         try:
+            # Read file content asynchronously
+            content = await file.read()
+            
+            # Check file size
+            if len(content) > settings.MAX_UPLOAD_SIZE:
+                raise HTTPException(
+                    status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                    detail=f"File too large. Maximum size: {settings.MAX_UPLOAD_SIZE / (1024*1024)}MB"
+                )
+            
+            # Write to disk
             with open(file_path, "wb") as buffer:
-                shutil.copyfileobj(file.file, buffer)
+                buffer.write(content)
+        except HTTPException:
+            raise
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Could not save file: {str(e)}")
             

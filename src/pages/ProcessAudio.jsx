@@ -35,9 +35,15 @@ const ProcessAudio = () => {
         return () => {
             if (wavesurfer.current) {
                 try {
+                    // Détacher tous les événements
+                    wavesurfer.current.unAll();
+                    // Détruire l'instance
                     wavesurfer.current.destroy();
                 } catch (error) {
-                    console.log('WaveSurfer cleanup');
+                    // Ignorer les erreurs de destruction
+                    console.log('WaveSurfer cleanup:', error.message);
+                } finally {
+                    wavesurfer.current = null;
                 }
             }
         };
@@ -45,34 +51,51 @@ const ProcessAudio = () => {
 
     const initializeWaveform = (audioFile) => {
         if (waveformRef.current && audioFile) {
+            // Nettoyer l'instance précédente de manière sécurisée
             if (wavesurfer.current) {
                 try {
+                    // Détacher les événements avant de détruire
+                    wavesurfer.current.unAll();
+                    // Détruire l'instance
                     wavesurfer.current.destroy();
                 } catch (error) {
-                    console.log('WaveSurfer already destroyed');
+                    // Ignorer les erreurs de destruction (déjà détruit ou en cours)
+                    console.log('WaveSurfer cleanup:', error.message);
+                } finally {
+                    wavesurfer.current = null;
                 }
             }
 
-            wavesurfer.current = WaveSurfer.create({
-                container: waveformRef.current,
-                waveColor: '#AC6AFF',
-                progressColor: '#FFC876',
-                cursorColor: '#FFF',
-                barWidth: 2,
-                barRadius: 3,
-                cursorWidth: 1,
-                height: 150,
-                barGap: 2,
-                responsive: true,
-                normalize: true,
-            });
+            // Créer une nouvelle instance
+            try {
+                wavesurfer.current = WaveSurfer.create({
+                    container: waveformRef.current,
+                    waveColor: '#AC6AFF',
+                    progressColor: '#FFC876',
+                    cursorColor: '#FFF',
+                    barWidth: 2,
+                    barRadius: 3,
+                    cursorWidth: 1,
+                    height: 150,
+                    barGap: 2,
+                    responsive: true,
+                    normalize: true,
+                });
 
-            const url = URL.createObjectURL(audioFile);
-            wavesurfer.current.load(url);
+                const url = URL.createObjectURL(audioFile);
+                wavesurfer.current.load(url);
 
-            wavesurfer.current.on('play', () => setIsPlaying(true));
-            wavesurfer.current.on('pause', () => setIsPlaying(false));
-            wavesurfer.current.on('finish', () => setIsPlaying(false));
+                wavesurfer.current.on('play', () => setIsPlaying(true));
+                wavesurfer.current.on('pause', () => setIsPlaying(false));
+                wavesurfer.current.on('finish', () => setIsPlaying(false));
+                
+                // Nettoyer l'URL après le chargement
+                wavesurfer.current.on('ready', () => {
+                    URL.revokeObjectURL(url);
+                });
+            } catch (error) {
+                console.error('Error initializing WaveSurfer:', error);
+            }
         }
     };
 
