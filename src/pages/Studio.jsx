@@ -24,6 +24,10 @@ const Studio = () => {
             return;
         }
 
+        // Nettoyer les anciennes données avant le nouvel upload
+        localStorage.removeItem('audioUploadInfo');
+        localStorage.removeItem('audioAnalysis');
+
         const formData = new FormData();
         formData.append("file", selectedFile);
 
@@ -40,7 +44,15 @@ const Studio = () => {
             }
 
             const uploadData = await uploadResponse.json();
-
+            
+            // Sauvegarder les données dans localStorage pour persistance
+            const uploadInfo = {
+                filename: uploadData.filename,
+                originalName: selectedFile.name,
+                uploadTime: Date.now()
+            };
+            localStorage.setItem('audioUploadInfo', JSON.stringify(uploadInfo));
+            
             // Reset loading before navigation
             setLoading(false);
 

@@ -184,7 +184,7 @@ Utilise le format Markdown suivant avec une hiérarchie claire :
 - Utilise **gras** pour les termes techniques, valeurs importantes, et concepts clés
 - Référence les valeurs exactes des métriques dans ton analyse
 - Structure clairement avec des titres de niveaux appropriés
-- Sois spécifique avec les valeurs numériques (ex: "Crest Factor de {crest_factor} dB indique...")"""
+- Sois spécifique avec les valeurs numériques (ex: "Crest Factor de X dB indique..." en utilisant les valeurs réelles fournies)"""
 
             # Utiliser le premier modèle disponible (prioriser les modèles récents)
             # Ordre de priorité : flash (rapide) > pro (puissant) > autres

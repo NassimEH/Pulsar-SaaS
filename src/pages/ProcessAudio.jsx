@@ -20,14 +20,39 @@ const ProcessAudio = () => {
     const [processing, setProcessing] = useState(false);
     const [downloadUrl, setDownloadUrl] = useState("");
     const [isPlaying, setIsPlaying] = useState(false);
+    const [loadingAnalysis, setLoadingAnalysis] = useState(false);
 
     useEffect(() => {
-        if (location.state?.file && location.state?.filename) {
-            setFile(location.state.file);
-            analyzeFile(location.state.filename);
-            setTimeout(() => {
-                initializeWaveform(location.state.file);
-            }, 100);
+        // Essayer d'abord location.state, puis localStorage
+        let file = location.state?.file;
+        let filename = location.state?.filename;
+        
+        // Si pas dans location.state, essayer localStorage
+        if (!filename) {
+            const savedInfo = localStorage.getItem('audioUploadInfo');
+            if (savedInfo) {
+                try {
+                    const info = JSON.parse(savedInfo);
+                    filename = info.filename;
+                    // Si on a le file dans location.state, on le garde, sinon on essaie de le recréer
+                    if (!file && info.originalName) {
+                        // On ne peut pas recréer le File object, mais on peut continuer avec le filename
+                        // Le waveform sera initialisé plus tard si on a le file
+                    }
+                } catch (e) {
+                    console.error("Error parsing saved upload info:", e);
+                }
+            }
+        }
+        
+        if (filename) {
+            if (file) {
+                setFile(file);
+                setTimeout(() => {
+                    initializeWaveform(file);
+                }, 100);
+            }
+            analyzeFile(filename);
         } else {
             navigate("/studio");
         }
@@ -111,15 +136,22 @@ const ProcessAudio = () => {
                 method: "POST"
             });
             const data = await response.json();
-            setAnalysis(data.features);
+            const features = data.features;
+            setAnalysis(features);
+            
+            // Sauvegarder l'analyse dans localStorage pour persistance
+            localStorage.setItem('audioAnalysis', JSON.stringify(features));
         } catch (error) {
             console.error("Analysis error:", error);
-            setAnalysis({
+            const fallbackAnalysis = {
                 bpm: 120,
                 key: "C",
                 rms_level: 0.5,
                 spectral_centroid: 2000
-            });
+            };
+            setAnalysis(fallbackAnalysis);
+            // Sauvegarder même l'analyse de fallback
+            localStorage.setItem('audioAnalysis', JSON.stringify(fallbackAnalysis));
         }
     };
 
@@ -177,11 +209,73 @@ const ProcessAudio = () => {
         if (!file) return;
 
         if (option.id === "analyze") {
+            // Récupérer le filename
+            const currentFilename = location.state?.filename || (() => {
+                const savedInfo = localStorage.getItem('audioUploadInfo');
+                if (savedInfo) {
+                    try {
+                        return JSON.parse(savedInfo).filename;
+                    } catch (e) {
+                        return null;
+                    }
+                }
+                return null;
+            })();
+            
+            if (!currentFilename) {
+                alert("Fichier non trouvé. Veuillez réuploader le fichier.");
+                navigate("/studio");
+                return;
+            }
+            
+            // Récupérer l'analyse depuis le state, ou depuis localStorage, ou la charger
+            let currentAnalysis = analysis;
+            
+            // Si l'analyse n'est pas encore chargée, essayer localStorage
+            if (!currentAnalysis) {
+                const savedAnalysis = localStorage.getItem('audioAnalysis');
+                if (savedAnalysis) {
+                    try {
+                        currentAnalysis = JSON.parse(savedAnalysis);
+                    } catch (e) {
+                        console.error("Error parsing saved analysis:", e);
+                    }
+                }
+            }
+            
+            // Si toujours pas d'analyse, la charger maintenant
+            if (!currentAnalysis) {
+                setLoadingAnalysis(true);
+                try {
+                    const response = await fetch(`http://localhost:8000/api/analyze?filename=${currentFilename}`, {
+                        method: "POST"
+                    });
+                    if (response.ok) {
+                        const data = await response.json();
+                        currentAnalysis = data.features;
+                        setAnalysis(currentAnalysis);
+                        localStorage.setItem('audioAnalysis', JSON.stringify(currentAnalysis));
+                    } else {
+                        throw new Error("Failed to analyze");
+                    }
+                } catch (error) {
+                    console.error("Error loading analysis:", error);
+                    setLoadingAnalysis(false);
+                    alert("Impossible de charger l'analyse. Veuillez réessayer.");
+                    return;
+                } finally {
+                    setLoadingAnalysis(false);
+                }
+            }
+            
+            // Sauvegarder l'analyse dans localStorage pour persistance
+            localStorage.setItem('audioAnalysis', JSON.stringify(currentAnalysis));
+            
             navigate("/analyze-ai", {
                 state: {
                     file: file,
-                    filename: location.state.filename,
-                    analysis: analysis
+                    filename: currentFilename,
+                    analysis: currentAnalysis
                 }
             });
             return;
@@ -314,21 +408,36 @@ const ProcessAudio = () => {
                         {processingOptions.map((option) => (
                             <div
                                 key={option.id}
-                                className="block relative p-0.5 bg-no-repeat bg-[length:100%_100%] md:max-w-[24rem] cursor-pointer transition-transform hover:scale-105"
+                                className={`block relative p-0.5 bg-no-repeat bg-[length:100%_100%] md:max-w-[24rem] transition-transform ${
+                                    loadingAnalysis && option.id === "analyze" 
+                                        ? "opacity-50 cursor-wait" 
+                                        : "cursor-pointer hover:scale-105"
+                                }`}
                                 style={{
                                     backgroundImage: `url(${option.backgroundUrl})`,
                                 }}
-                                onClick={() => handleProcess(option)}
+                                onClick={() => !(loadingAnalysis && option.id === "analyze") && handleProcess(option)}
                             >
                                 <div className="relative z-2 flex flex-col min-h-[22rem] p-[2.4rem] pointer-events-none">
                                     <div className="text-6xl mb-5">{option.icon}</div>
                                     <h5 className="h5 mb-5">{option.title}</h5>
                                     <p className="body-2 mb-6 text-n-3">{option.description}</p>
                                     <div className="flex items-center mt-auto">
-                                        <p className="ml-auto font-code text-xs font-bold text-n-1 uppercase tracking-wider pointer-events-auto">
-                                            {option.id === "analyze" ? "Voir l'analyse" : "Appliquer"}
-                                        </p>
-                                        <Arrow />
+                                        {loadingAnalysis && option.id === "analyze" ? (
+                                            <div className="ml-auto flex items-center gap-2">
+                                                <div className="w-4 h-4 border-2 border-n-1 border-t-transparent rounded-full animate-spin"></div>
+                                                <p className="font-code text-xs font-bold text-n-1 uppercase tracking-wider">
+                                                    Chargement...
+                                                </p>
+                                            </div>
+                                        ) : (
+                                            <>
+                                                <p className="ml-auto font-code text-xs font-bold text-n-1 uppercase tracking-wider pointer-events-auto">
+                                                    {option.id === "analyze" ? "Voir l'analyse" : "Appliquer"}
+                                                </p>
+                                                <Arrow />
+                                            </>
+                                        )}
                                     </div>
                                 </div>
 

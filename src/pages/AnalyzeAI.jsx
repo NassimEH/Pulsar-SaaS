@@ -17,11 +17,58 @@ const AnalyzeAI = () => {
     const [progress, setProgress] = useState(0);
 
     useEffect(() => {
-        if (location.state?.file && location.state?.filename && location.state?.analysis) {
-            setFile(location.state.file);
-            setAnalysis(location.state.analysis);
-            generateAiReport(location.state.analysis);
+        // Essayer d'abord location.state, puis localStorage
+        let file = location.state?.file;
+        let filename = location.state?.filename;
+        let analysis = location.state?.analysis;
+        
+        // Si des données manquent, essayer localStorage
+        if (!filename || !analysis) {
+            const savedInfo = localStorage.getItem('audioUploadInfo');
+            const savedAnalysis = localStorage.getItem('audioAnalysis');
+            
+            if (savedInfo) {
+                try {
+                    const info = JSON.parse(savedInfo);
+                    if (!filename) filename = info.filename;
+                } catch (e) {
+                    console.error("Error parsing saved upload info:", e);
+                }
+            }
+            
+            if (savedAnalysis && !analysis) {
+                try {
+                    analysis = JSON.parse(savedAnalysis);
+                } catch (e) {
+                    console.error("Error parsing saved analysis:", e);
+                }
+            }
+        }
+        
+        // Si on a au moins filename et analysis, on peut continuer
+        if (filename && analysis) {
+            if (file) {
+                setFile(file);
+            } else {
+                // Si on n'a pas le file object, on peut quand même afficher l'analyse
+                // Le nom du fichier sera affiché depuis savedInfo
+                const savedInfo = localStorage.getItem('audioUploadInfo');
+                if (savedInfo) {
+                    try {
+                        const info = JSON.parse(savedInfo);
+                        // Créer un objet file minimal pour l'affichage
+                        setFile({ name: info.originalName || filename });
+                    } catch (e) {
+                        setFile({ name: filename });
+                    }
+                } else {
+                    setFile({ name: filename });
+                }
+            }
+            setAnalysis(analysis);
+            generateAiReport(analysis);
         } else {
+            // Si vraiment rien n'est disponible, rediriger vers studio
             navigate("/studio");
         }
     }, [location, navigate]);
@@ -186,7 +233,37 @@ Vérifiez que :
                             {!loading && (
                                 <div className="mt-8 flex justify-center">
                                     <button
-                                        onClick={() => navigate("/process", { state: location.state })}
+                                        onClick={() => {
+                                            // Récupérer les données depuis location.state ou localStorage
+                                            const stateData = location.state || {};
+                                            const savedInfo = localStorage.getItem('audioUploadInfo');
+                                            const savedAnalysis = localStorage.getItem('audioAnalysis');
+                                            
+                                            let navState = { ...stateData };
+                                            
+                                            // Compléter avec localStorage si nécessaire
+                                            if (!navState.filename && savedInfo) {
+                                                try {
+                                                    const info = JSON.parse(savedInfo);
+                                                    navState.filename = info.filename;
+                                                    if (!navState.file) {
+                                                        navState.file = { name: info.originalName || info.filename };
+                                                    }
+                                                } catch (e) {
+                                                    console.error("Error parsing saved info:", e);
+                                                }
+                                            }
+                                            
+                                            if (!navState.analysis && savedAnalysis) {
+                                                try {
+                                                    navState.analysis = JSON.parse(savedAnalysis);
+                                                } catch (e) {
+                                                    console.error("Error parsing saved analysis:", e);
+                                                }
+                                            }
+                                            
+                                            navigate("/process", { state: navState });
+                                        }}
                                         className="px-8 py-3 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 rounded-xl font-semibold text-white transition-all duration-300 shadow-lg hover:shadow-xl hover:scale-105"
                                     >
                                         Retour aux options
