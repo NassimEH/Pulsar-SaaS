@@ -8,6 +8,7 @@ import Transpose from "./pages/Transpose";
 import SlowedVersion from "./pages/SlowedVersion";
 import Nightcore from "./pages/Nightcore";
 import Compare from "./pages/Compare";
+import Custom from "./pages/Custom";
 
 const App = () => {
   return (
@@ -22,6 +23,7 @@ const App = () => {
           <Route path="/slowed" element={<SlowedVersion />} />
           <Route path="/nightcore" element={<Nightcore />} />
           <Route path="/compare" element={<Compare />} />
+          <Route path="/custom" element={<Custom />} />
         </Routes>
       </div>
 

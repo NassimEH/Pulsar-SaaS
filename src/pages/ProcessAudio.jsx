@@ -303,8 +303,8 @@ const ProcessAudio = () => {
             return;
         }
 
-        // Navigation vers les pages spécialisées
-        if (option.id === "transpose" || option.id === "slowed" || option.id === "nightcore" || option.id === "compare" || option.isNavigation) {
+               // Navigation vers les pages spécialisées
+               if (option.id === "transpose" || option.id === "slowed" || option.id === "nightcore" || option.id === "compare" || option.id === "custom" || option.isNavigation) {
             const currentFilename = location.state?.filename || (() => {
                 const savedInfo = localStorage.getItem('audioUploadInfo');
                 if (savedInfo) {
@@ -337,7 +337,9 @@ const ProcessAudio = () => {
             const routes = {
                 "transpose": "/transpose",
                 "slowed": "/slowed",
-                "nightcore": "/nightcore"
+                "nightcore": "/nightcore",
+                "compare": "/compare",
+                "custom": "/custom"
             };
             
             const route = routes[option.id] || null;
