@@ -139,3 +139,4 @@ Toutes ces métriques sont automatiquement transmises à l'IA Gemini qui :
 4. Génère des recommandations précises et techniques
 5. Fournit des valeurs cibles spécifiques pour l'amélioration
 
+

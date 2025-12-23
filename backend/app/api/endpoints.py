@@ -4,7 +4,8 @@ from ..services.upload import UploadService
 from ..services.analysis import FeatureExtractor
 from ..services.audio import AudioProcessor
 from ..services.gemini_ai import GeminiAIService
-from ..models.schemas import AnalysisResponse, ProcessRequest, ProcessResponse, AIAnalysisRequest, AIAnalysisResponse
+from ..services.comparison import ComparisonService
+from ..models.schemas import AnalysisResponse, ProcessRequest, ProcessResponse, AIAnalysisRequest, AIAnalysisResponse, ComparisonRequest, ComparisonResponse
 
 router = APIRouter()
 
@@ -46,7 +47,8 @@ async def process_audio(request: ProcessRequest):
             file_path, 
             speed=request.speed, 
             pitch=request.pitch, 
-            nightcore=request.nightcore
+            nightcore=request.nightcore,
+            reverb=request.reverb
         )
         return ProcessResponse(download_url=f"/api/download/{output_path.name}")
     except Exception as e:
@@ -55,10 +57,48 @@ async def process_audio(request: ProcessRequest):
 @router.get("/download/{filename}")
 async def download_file(filename: str):
     from ..core.config import settings
+    # Chercher d'abord dans processed, puis dans uploads
     file_path = settings.PROCESSED_DIR / filename
     if not file_path.exists():
-        raise HTTPException(status_code=404, detail="File not found")
+        file_path = settings.UPLOAD_DIR / filename
+        if not file_path.exists():
+            raise HTTPException(status_code=404, detail="File not found")
     return FileResponse(file_path, media_type="audio/wav", filename=filename)
+
+@router.post("/compare", response_model=ComparisonResponse)
+async def compare_audio(request: ComparisonRequest):
+    """
+    Compare deux fichiers audio et retourne un score de ressemblance
+    """
+    try:
+        # Récupérer les chemins des fichiers
+        original_path = UploadService.get_file_path(request.original_filename)
+        reference_path = UploadService.get_file_path(request.reference_filename)
+        
+        if not original_path.exists():
+            raise HTTPException(status_code=404, detail=f"Fichier original non trouvé: {request.original_filename}")
+        if not reference_path.exists():
+            raise HTTPException(status_code=404, detail=f"Fichier de référence non trouvé: {request.reference_filename}")
+        
+        # Analyser les deux fichiers
+        print(f"Analyzing original file: {request.original_filename}")
+        original_features = FeatureExtractor.analyze(original_path)
+        
+        print(f"Analyzing reference file: {request.reference_filename}")
+        reference_features = FeatureExtractor.analyze(reference_path)
+        
+        # Comparer les métriques
+        comparison_result = ComparisonService.compare_features(original_features, reference_features)
+        
+        print(f"Comparison complete. Global score: {comparison_result['global_score']}%")
+        
+        return ComparisonResponse(**comparison_result)
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Comparison error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Erreur lors de la comparaison: {str(e)}")
 
 @router.post("/analyze-ai", response_model=AIAnalysisResponse)
 async def analyze_with_ai(request: AIAnalysisRequest):

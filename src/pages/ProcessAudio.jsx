@@ -9,6 +9,7 @@ import Heading from "../components/Heading";
 import { Gradient } from "../components/design/Services";
 import { GradientLight } from "../components/design/Benefits";
 import ClipPath from "../assets/svg/ClipPath";
+import { formatKeyWithMinor } from "../utils/keyUtils";
 
 const ProcessAudio = () => {
     const navigate = useNavigate();
@@ -62,11 +63,21 @@ const ProcessAudio = () => {
                 try {
                     // Détacher tous les événements
                     wavesurfer.current.unAll();
+                    // Arrêter la lecture si en cours
+                    try {
+                        if (wavesurfer.current.isPlaying && wavesurfer.current.isPlaying()) {
+                            wavesurfer.current.pause();
+                        }
+                    } catch (e) {
+                        // Ignorer si pause échoue
+                    }
                     // Détruire l'instance
                     wavesurfer.current.destroy();
                 } catch (error) {
-                    // Ignorer les erreurs de destruction
-                    console.log('WaveSurfer cleanup:', error.message);
+                    // Ignorer les erreurs de destruction, notamment les AbortError
+                    if (error.name !== 'AbortError' && error.message !== 'signal is aborted without reason') {
+                        console.log('WaveSurfer cleanup:', error.message);
+                    }
                 } finally {
                     wavesurfer.current = null;
                 }
@@ -81,11 +92,22 @@ const ProcessAudio = () => {
                 try {
                     // Détacher les événements avant de détruire
                     wavesurfer.current.unAll();
+                    // Arrêter la lecture si en cours
+                    try {
+                        if (wavesurfer.current.isPlaying && wavesurfer.current.isPlaying()) {
+                            wavesurfer.current.pause();
+                        }
+                    } catch (e) {
+                        // Ignorer si pause échoue
+                    }
                     // Détruire l'instance
                     wavesurfer.current.destroy();
                 } catch (error) {
                     // Ignorer les erreurs de destruction (déjà détruit ou en cours)
-                    console.log('WaveSurfer cleanup:', error.message);
+                    // Ne pas logger les AbortError qui sont normales lors de la destruction
+                    if (error.name !== 'AbortError' && error.message !== 'signal is aborted without reason') {
+                        console.log('WaveSurfer cleanup:', error.message);
+                    }
                 } finally {
                     wavesurfer.current = null;
                 }
@@ -170,7 +192,7 @@ const ProcessAudio = () => {
             description: "Changez la tonalité de votre piste sans affecter le tempo.",
             icon: "🎹",
             backgroundUrl: "./src/assets/benefits/card-2.svg",
-            params: { pitch: 2 },
+            isNavigation: true, // Indique que c'est une navigation, pas un traitement direct
         },
         {
             id: "slowed",
@@ -178,7 +200,7 @@ const ProcessAudio = () => {
             description: "Ralentissez votre track pour un effet chill et atmosphérique.",
             icon: "🐌",
             backgroundUrl: "./src/assets/benefits/card-3.svg",
-            params: { speed: 0.8 },
+            isNavigation: true, // Indique que c'est une navigation, pas un traitement direct
         },
         {
             id: "nightcore",
@@ -186,15 +208,15 @@ const ProcessAudio = () => {
             description: "Accélérez et montez le pitch pour un effet énergique.",
             icon: "⚡",
             backgroundUrl: "./src/assets/benefits/card-4.svg",
-            params: { speed: 1.25, pitch: 3, nightcore: true },
+            isNavigation: true, // Indique que c'est une navigation, pas un traitement direct
         },
         {
-            id: "pitchup",
-            title: "Pitch Up",
-            description: "Augmentez la hauteur tonale sans modifier la vitesse.",
-            icon: "⬆️",
+            id: "compare",
+            title: "Comparaison avec référence",
+            description: "Comparez votre mix avec une référence professionnelle.",
+            icon: "📊",
             backgroundUrl: "./src/assets/benefits/card-5.svg",
-            params: { pitch: 5 },
+            isNavigation: true, // À développer plus tard
         },
         {
             id: "custom",
@@ -279,6 +301,55 @@ const ProcessAudio = () => {
                 }
             });
             return;
+        }
+
+        // Navigation vers les pages spécialisées
+        if (option.id === "transpose" || option.id === "slowed" || option.id === "nightcore" || option.id === "compare" || option.isNavigation) {
+            const currentFilename = location.state?.filename || (() => {
+                const savedInfo = localStorage.getItem('audioUploadInfo');
+                if (savedInfo) {
+                    try {
+                        return JSON.parse(savedInfo).filename;
+                    } catch (e) {
+                        return null;
+                    }
+                }
+                return null;
+            })();
+            
+            if (!currentFilename) {
+                alert("Fichier non trouvé. Veuillez réuploader le fichier.");
+                navigate("/studio");
+                return;
+            }
+            
+            // Navigation vers la page de comparaison
+            if (option.id === "compare") {
+                navigate("/compare", {
+                    state: {
+                        file: file,
+                        filename: currentFilename
+                    }
+                });
+                return;
+            }
+            
+            const routes = {
+                "transpose": "/transpose",
+                "slowed": "/slowed",
+                "nightcore": "/nightcore"
+            };
+            
+            const route = routes[option.id] || null;
+            if (route) {
+                navigate(route, {
+                    state: {
+                        file: file,
+                        filename: currentFilename
+                    }
+                });
+                return;
+            }
         }
 
         setProcessing(true);
@@ -371,7 +442,9 @@ const ProcessAudio = () => {
                                                 <div className="absolute inset-0 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl opacity-0 group-hover:opacity-10 transition-opacity"></div>
                                                 <div className="relative p-5 rounded-xl border border-n-6/30 text-center backdrop-blur-sm hover:border-blue-500/30 transition-all">
                                                     <div className="text-xs text-n-4 mb-2 uppercase tracking-wider font-semibold">Tonalité</div>
-                                                    <div className="text-3xl font-bold bg-gradient-to-r from-blue-400 to-cyan-400 bg-clip-text text-transparent">{analysis.key}</div>
+                                                    <div className="text-3xl font-bold bg-gradient-to-r from-blue-400 to-cyan-400 bg-clip-text text-transparent">
+                                                        {formatKeyWithMinor(analysis.key)}
+                                                    </div>
                                                     <div className="text-xs text-n-4 mt-1">Clé</div>
                                                 </div>
                                             </div>
@@ -448,12 +521,12 @@ const ProcessAudio = () => {
                                     style={{ clipPath: "url(#benefits)" }}
                                 >
                                     <div className="absolute inset-0 opacity-0 transition-opacity hover:opacity-10">
-                                        {option.id === "analyze" && <div className="absolute inset-0 bg-color-1"></div>}
-                                        {option.id === "transpose" && <div className="absolute inset-0 bg-color-2"></div>}
-                                        {option.id === "slowed" && <div className="absolute inset-0 bg-color-3"></div>}
-                                        {option.id === "nightcore" && <div className="absolute inset-0 bg-color-4"></div>}
-                                        {option.id === "pitchup" && <div className="absolute inset-0 bg-color-5"></div>}
-                                        {option.id === "custom" && <div className="absolute inset-0 bg-color-6"></div>}
+                                               {option.id === "analyze" && <div className="absolute inset-0 bg-color-1"></div>}
+                                               {option.id === "transpose" && <div className="absolute inset-0 bg-color-2"></div>}
+                                               {option.id === "slowed" && <div className="absolute inset-0 bg-color-3"></div>}
+                                               {option.id === "nightcore" && <div className="absolute inset-0 bg-color-4"></div>}
+                                               {option.id === "compare" && <div className="absolute inset-0 bg-color-5"></div>}
+                                               {option.id === "custom" && <div className="absolute inset-0 bg-color-6"></div>}
                                     </div>
                                 </div>
 

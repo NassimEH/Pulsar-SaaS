@@ -6,6 +6,7 @@ import Section from "../components/Section";
 import Heading from "../components/Heading";
 import { Gradient } from "../components/design/Services";
 import MarkdownReport from "../components/MarkdownReport";
+import { formatKeyWithMinor } from "../utils/keyUtils";
 
 const AnalyzeAI = () => {
     const navigate = useNavigate();
@@ -170,11 +171,13 @@ Vérifiez que :
                                     <div className="text-2xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">{analysis.bpm}</div>
                                     <div className="text-xs text-n-4 mt-1">BPM</div>
                                 </div>
-                                <div className="p-4 bg-n-7/50 rounded-xl border border-n-6/30 text-center">
-                                    <div className="text-xs text-n-4 mb-1 uppercase tracking-wider">Tonalité</div>
-                                    <div className="text-2xl font-bold bg-gradient-to-r from-blue-400 to-cyan-400 bg-clip-text text-transparent">{analysis.key}</div>
-                                    <div className="text-xs text-n-4 mt-1">Clé</div>
-                                </div>
+                                    <div className="p-4 bg-n-7/50 rounded-xl border border-n-6/30 text-center">
+                                        <div className="text-xs text-n-4 mb-1 uppercase tracking-wider">Tonalité</div>
+                                        <div className="text-2xl font-bold bg-gradient-to-r from-blue-400 to-cyan-400 bg-clip-text text-transparent">
+                                            {formatKeyWithMinor(analysis.key)}
+                                        </div>
+                                        <div className="text-xs text-n-4 mt-1">Clé</div>
+                                    </div>
                                 <div className="p-4 bg-n-7/50 rounded-xl border border-n-6/30 text-center">
                                     <div className="text-xs text-n-4 mb-1 uppercase tracking-wider">Volume</div>
                                     <div className="text-2xl font-bold bg-gradient-to-r from-green-400 to-teal-400 bg-clip-text text-transparent">{analysis.rms_level.toFixed(2)}</div>
