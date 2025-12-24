@@ -29,7 +29,7 @@ from app.api.endpoints import router as api_router
 from app.api.auth import router as auth_router
 
 app.include_router(api_router, prefix="/api")
-app.include_router(auth_router)
+app.include_router(auth_router, prefix="/api")  # Le router auth a déjà le prefix "/auth", donc ça devient "/api/auth"
 
 @app.get("/")
 async def root():

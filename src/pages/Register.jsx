@@ -31,20 +31,30 @@ const Register = () => {
       return;
     }
 
+    if (password.length > 72) {
+      setError('Le mot de passe ne peut pas dépasser 72 caractères');
+      return;
+    }
+
     setLoading(true);
     setError('');
 
     try {
+      console.log('Starting registration...');
       const result = await register(email, password, fullName);
+      console.log('Registration result:', result);
       
-      if (result.success) {
+      if (result && result.success) {
+        console.log('Registration successful, navigating...');
         navigate('/studio');
       } else {
-        setError(result.error || 'Erreur d\'inscription');
+        const errorMsg = result?.error || 'Erreur d\'inscription';
+        console.error('Registration failed:', errorMsg);
+        setError(errorMsg);
         setLoading(false);
       }
     } catch (error) {
-      console.error('Registration error:', error);
+      console.error('Registration exception:', error);
       setError(error.message || 'Erreur d\'inscription');
       setLoading(false);
     }

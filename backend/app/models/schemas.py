@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, validator
 from typing import Optional
 
 # Authentification
@@ -6,6 +6,14 @@ class UserRegister(BaseModel):
     email: EmailStr
     password: str
     full_name: Optional[str] = None
+    
+    @validator('password')
+    def validate_password(cls, v):
+        if len(v) < 6:
+            raise ValueError('Le mot de passe doit contenir au moins 6 caractères')
+        if len(v.encode('utf-8')) > 72:
+            raise ValueError('Le mot de passe ne peut pas dépasser 72 caractères')
+        return v
 
 class UserLogin(BaseModel):
     email: EmailStr
@@ -22,6 +30,18 @@ class UserResponse(BaseModel):
     plan: str
     is_active: bool
     is_verified: bool
+    
+    @classmethod
+    def from_orm(cls, obj):
+        """Convertit un objet User en UserResponse"""
+        return cls(
+            id=obj.id,
+            email=obj.email,
+            full_name=obj.full_name,
+            plan=obj.plan.value if hasattr(obj.plan, 'value') else str(obj.plan),
+            is_active=obj.is_active,
+            is_verified=obj.is_verified
+        )
     
     class Config:
         from_attributes = True

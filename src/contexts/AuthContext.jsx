@@ -16,13 +16,20 @@ export const AuthProvider = ({ children }) => {
     } else {
       setLoading(false);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
-  const fetchUserInfo = async () => {
+  const fetchUserInfo = async (tokenToUse = null) => {
+    const currentToken = tokenToUse || token;
+    if (!currentToken) {
+      setLoading(false);
+      return;
+    }
+    
     try {
       const response = await fetch(`${API_URL}/api/auth/me`, {
         headers: {
-          'Authorization': `Bearer ${token}`
+          'Authorization': `Bearer ${currentToken}`
         }
       });
       
@@ -65,28 +72,38 @@ export const AuthProvider = ({ children }) => {
       const data = await response.json();
       const newToken = data.access_token;
       
+      if (!newToken) {
+        throw new Error('Token non reçu du serveur');
+      }
+      
       // Mettre à jour le token
       localStorage.setItem('auth_token', newToken);
       setToken(newToken);
       
       // Récupérer les infos utilisateur avec le nouveau token (sans attendre useEffect)
+      console.log('Fetching user info with token:', newToken.substring(0, 20) + '...');
       const userResponse = await fetch(`${API_URL}/api/auth/me`, {
+        method: 'GET',
         headers: {
-          'Authorization': `Bearer ${newToken}`
-        }
+          'Authorization': `Bearer ${newToken}`,
+          'Content-Type': 'application/json'
+        },
+        credentials: 'include'
       });
+      console.log('User response status:', userResponse.status);
       
       if (userResponse.ok) {
         const userData = await userResponse.json();
         setUser(userData);
+        return { success: true };
       } else {
         // Si erreur, nettoyer
+        const errorText = await userResponse.text();
+        console.error('Error fetching user info after login:', errorText);
         localStorage.removeItem('auth_token');
         setToken(null);
         throw new Error('Impossible de récupérer les informations utilisateur');
       }
-      
-      return { success: true };
     } catch (error) {
       console.error('Login error:', error);
       return { success: false, error: error.message || 'Erreur de connexion' };
