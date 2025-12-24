@@ -9,6 +9,8 @@ import SlowedVersion from "./pages/SlowedVersion";
 import Nightcore from "./pages/Nightcore";
 import Compare from "./pages/Compare";
 import Custom from "./pages/Custom";
+import Login from "./pages/Login";
+import Register from "./pages/Register";
 
 const App = () => {
   return (
@@ -24,6 +26,8 @@ const App = () => {
           <Route path="/nightcore" element={<Nightcore />} />
           <Route path="/compare" element={<Compare />} />
           <Route path="/custom" element={<Custom />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
         </Routes>
       </div>
 

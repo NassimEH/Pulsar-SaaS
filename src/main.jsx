@@ -3,6 +3,7 @@ import ReactDOM from "react-dom/client";
 import { BrowserRouter as Router } from "react-router-dom";
 
 import App from "./App.jsx";
+import { AuthProvider } from "./contexts/AuthContext";
 import "./index.css";
 
 // Filtrer les erreurs Socket.IO de Puter.js et WaveSurfer AbortError dans la console
@@ -48,7 +49,9 @@ if (typeof window !== 'undefined') {
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
     <Router>
-      <App />
+      <AuthProvider>
+        <App />
+      </AuthProvider>
     </Router>
   </React.StrictMode>
 );

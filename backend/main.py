@@ -21,9 +21,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Initialiser la base de données au démarrage
+from app.core.database import init_db
+init_db()
+
 from app.api.endpoints import router as api_router
+from app.api.auth import router as auth_router
 
 app.include_router(api_router, prefix="/api")
+app.include_router(auth_router)
 
 @app.get("/")
 async def root():
