@@ -61,6 +61,23 @@ const Header = () => {
                 {item.title}
               </a>
             ))}
+            
+            {isAuthenticated && (
+              <a
+                href="/profile"
+                onClick={(e) => {
+                  e.preventDefault();
+                  handleClick();
+                  navigate('/profile');
+                }}
+                className={`block relative font-code text-2xl uppercase text-n-1 transition-colors hover:text-color-1 lg:hidden px-6 py-6 md:py-8 lg:-mr-0.25 lg:text-xs lg:font-semibold ${pathname.pathname === '/profile'
+                  ? "z-2 lg:text-n-1"
+                  : "lg:text-n-1/50"
+                } lg:leading-5 lg:hover:text-n-1 xl:px-12`}
+              >
+                Profil
+              </a>
+            )}
           </div>
 
           <HamburgerMenu />
@@ -69,9 +86,17 @@ const Header = () => {
         {isAuthenticated ? (
           <>
             <div className="hidden lg:flex items-center gap-4 mr-8">
-              <span className="text-n-2 text-sm font-code">
-                {user?.full_name || user?.email}
-              </span>
+              <button
+                onClick={() => navigate('/profile')}
+                className="flex items-center gap-3 px-4 py-2 rounded-lg hover:bg-n-7/50 transition-colors group"
+              >
+                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-color-1 to-color-5 flex items-center justify-center text-sm font-bold text-n-1">
+                  {user?.full_name ? user.full_name.charAt(0).toUpperCase() : user?.email?.charAt(0).toUpperCase()}
+                </div>
+                <span className="text-n-2 text-sm font-code group-hover:text-n-1 transition-colors">
+                  {user?.full_name || user?.email?.split('@')[0]}
+                </span>
+              </button>
               <Button className="hidden lg:flex" onClick={logout}>
                 Déconnexion
               </Button>

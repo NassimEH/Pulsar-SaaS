@@ -20,6 +20,11 @@ class User:
         is_active: bool = True,
         is_verified: bool = False,
         plan: PlanType = PlanType.FREE,
+        avatar_url: Optional[str] = None,
+        bio: Optional[str] = None,
+        phone: Optional[str] = None,
+        location: Optional[str] = None,
+        website: Optional[str] = None,
         created_at: Optional[datetime] = None,
         updated_at: Optional[datetime] = None
     ):
@@ -30,6 +35,11 @@ class User:
         self.is_active = is_active
         self.is_verified = is_verified
         self.plan = plan if isinstance(plan, PlanType) else PlanType(plan)
+        self.avatar_url = avatar_url
+        self.bio = bio
+        self.phone = phone
+        self.location = location
+        self.website = website
         self.created_at = created_at
         self.updated_at = updated_at
     
@@ -52,6 +62,11 @@ class User:
             is_active=data.get("is_active", True),
             is_verified=data.get("is_verified", False),
             plan=PlanType(data.get("plan", "free")),
+            avatar_url=data.get("avatar_url"),
+            bio=data.get("bio"),
+            phone=data.get("phone"),
+            location=data.get("location"),
+            website=data.get("website"),
             created_at=data.get("created_at"),
             updated_at=data.get("updated_at")
         )
@@ -66,6 +81,11 @@ class User:
             "is_active": self.is_active,
             "is_verified": self.is_verified,
             "plan": self.plan.value,
+            "avatar_url": self.avatar_url,
+            "bio": self.bio,
+            "phone": self.phone,
+            "location": self.location,
+            "website": self.website,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None
         }

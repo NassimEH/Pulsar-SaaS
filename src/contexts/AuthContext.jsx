@@ -171,6 +171,12 @@ export const AuthProvider = ({ children }) => {
     localStorage.removeItem('auth_token');
   };
 
+  const refreshUser = async () => {
+    if (token) {
+      await fetchUserInfo(token);
+    }
+  };
+
   const value = {
     user,
     token,
@@ -178,6 +184,7 @@ export const AuthProvider = ({ children }) => {
     login,
     register,
     logout,
+    refreshUser,
     isAuthenticated: !!token && !!user
   };
 

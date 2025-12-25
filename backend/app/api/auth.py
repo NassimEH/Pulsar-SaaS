@@ -1,8 +1,10 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi import APIRouter, Depends, HTTPException, status, Request, UploadFile, File
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+import uuid
+from pathlib import Path
 from datetime import timedelta
 from typing import Optional
-from app.models.schemas import UserRegister, UserLogin, Token, UserResponse
+from app.models.schemas import UserRegister, UserLogin, Token, UserResponse, UserUpdate, PasswordChange
 from app.services.auth import (
     authenticate_user,
     create_user,
@@ -10,6 +12,8 @@ from app.services.auth import (
     get_user_by_email,
     get_user_by_id,
     verify_token,
+    update_user_profile,
+    update_user_password,
     ACCESS_TOKEN_EXPIRE_MINUTES
 )
 
@@ -174,8 +178,150 @@ async def get_current_user_info(request: Request):
         full_name=current_user.full_name,
         plan=current_user.plan.value if hasattr(current_user.plan, 'value') else str(current_user.plan),
         is_active=current_user.is_active,
-        is_verified=current_user.is_verified
+        is_verified=current_user.is_verified,
+        avatar_url=getattr(current_user, 'avatar_url', None),
+        bio=getattr(current_user, 'bio', None),
+        phone=getattr(current_user, 'phone', None),
+        location=getattr(current_user, 'location', None),
+        website=getattr(current_user, 'website', None)
     )
+
+@router.put("/me", response_model=UserResponse)
+async def update_profile(request: Request, user_update: UserUpdate):
+    """Mettre à jour le profil de l'utilisateur connecté"""
+    current_user = await get_current_user(request)
+    
+    update_data = user_update.dict(exclude_unset=True)
+    updated_user = update_user_profile(current_user.id, update_data)
+    
+    if not updated_user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Failed to update profile"
+        )
+    
+    return UserResponse(
+        id=updated_user.id,
+        email=updated_user.email,
+        full_name=updated_user.full_name,
+        plan=updated_user.plan.value if hasattr(updated_user.plan, 'value') else str(updated_user.plan),
+        is_active=updated_user.is_active,
+        is_verified=updated_user.is_verified,
+        avatar_url=getattr(updated_user, 'avatar_url', None),
+        bio=getattr(updated_user, 'bio', None),
+        phone=getattr(updated_user, 'phone', None),
+        location=getattr(updated_user, 'location', None),
+        website=getattr(updated_user, 'website', None)
+    )
+
+@router.put("/me/password")
+async def change_password(request: Request, password_data: PasswordChange):
+    """Changer le mot de passe de l'utilisateur connecté"""
+    from app.services.auth import authenticate_user
+    
+    current_user = await get_current_user(request)
+    
+    # Vérifier l'ancien mot de passe
+    if not authenticate_user(current_user.email, password_data.old_password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect old password"
+        )
+    
+    # Valider le nouveau mot de passe
+    if len(password_data.new_password) < 6:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Le mot de passe doit contenir au moins 6 caractères"
+        )
+    
+    # Mettre à jour le mot de passe
+    success = update_user_password(current_user.id, password_data.new_password)
+    if not success:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Failed to update password"
+        )
+    
+    return {"message": "Password updated successfully"}
+
+@router.post("/me/avatar")
+async def upload_avatar(request: Request, file: UploadFile = File(...)):
+    """Uploader une photo de profil"""
+    from app.core.config import settings
+    
+    current_user = await get_current_user(request)
+    
+    # Valider le type de fichier
+    if not file.content_type or not file.content_type.startswith("image/"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Le fichier doit être une image"
+        )
+    
+    # Limiter la taille (5MB max)
+    max_size = 5 * 1024 * 1024  # 5MB
+    content = await file.read()
+    if len(content) > max_size:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail="L'image est trop volumineuse (maximum 5MB)"
+        )
+    
+    # Générer un nom de fichier unique
+    ext = file.filename.split(".")[-1].lower() if "." in file.filename else "jpg"
+    if ext not in ["jpg", "jpeg", "png", "gif", "webp"]:
+        ext = "jpg"
+    
+    file_id = str(uuid.uuid4())
+    saved_filename = f"avatar_{current_user.id}_{file_id}.{ext}"
+    
+    # Créer le dossier avatars s'il n'existe pas
+    avatars_dir = Path(settings.UPLOAD_DIR) / "avatars"
+    avatars_dir.mkdir(parents=True, exist_ok=True)
+    
+    file_path = avatars_dir / saved_filename
+    
+    # Sauvegarder le fichier
+    try:
+        with open(file_path, "wb") as buffer:
+            buffer.write(content)
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Erreur lors de la sauvegarde: {str(e)}"
+        )
+    
+    # Mettre à jour l'URL de l'avatar dans la base de données
+    avatar_url = f"/api/avatars/{saved_filename}"
+    updated_user = update_user_profile(current_user.id, {"avatar_url": avatar_url})
+    
+    if not updated_user:
+        # Supprimer le fichier si la mise à jour échoue
+        try:
+            file_path.unlink()
+        except:
+            pass
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Failed to update avatar"
+        )
+    
+    return {"avatar_url": avatar_url, "message": "Avatar uploaded successfully"}
+
+@router.get("/avatars/{filename}")
+async def get_avatar(filename: str):
+    """Récupérer une photo de profil"""
+    from fastapi.responses import FileResponse
+    from app.core.config import settings
+    
+    avatars_dir = Path(settings.UPLOAD_DIR) / "avatars"
+    file_path = avatars_dir / filename
+    
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail="Avatar not found")
+    
+    return FileResponse(file_path)
 
 @router.get("/verify-token")
 async def verify_user_token(request: Request):

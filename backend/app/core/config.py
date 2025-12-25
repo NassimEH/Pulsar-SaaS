@@ -71,6 +71,7 @@ class Settings:
         # Ensure directories exist
         self.UPLOAD_DIR.mkdir(exist_ok=True)
         self.PROCESSED_DIR.mkdir(exist_ok=True)
+        (self.UPLOAD_DIR / "avatars").mkdir(exist_ok=True)
     
     ALLOWED_EXTENSIONS: set = {"mp3", "wav", "ogg", "flac"}
     MAX_UPLOAD_SIZE: int = 50 * 1024 * 1024  # 50 MB

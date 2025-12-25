@@ -187,3 +187,38 @@ def authenticate_user(email: str, password: str) -> Optional[User]:
         return None
     print(f"User authenticated successfully: {email}")
     return user
+
+def update_user_profile(user_id: int, update_data: dict) -> Optional[User]:
+    """Met à jour le profil d'un utilisateur"""
+    supabase = get_supabase()
+    try:
+        # Filtrer les valeurs None
+        filtered_data = {k: v for k, v in update_data.items() if v is not None}
+        if not filtered_data:
+            return get_user_by_id(user_id)
+        
+        filtered_data["updated_at"] = datetime.utcnow().isoformat()
+        
+        result = supabase.table("users").update(filtered_data).eq("id", user_id).execute()
+        if result.data and len(result.data) > 0:
+            return User.from_dict(result.data[0])
+        return None
+    except Exception as e:
+        print(f"Error updating user profile: {e}")
+        import traceback
+        traceback.print_exc()
+        return None
+
+def update_user_password(user_id: int, new_password: str) -> bool:
+    """Met à jour le mot de passe d'un utilisateur"""
+    supabase = get_supabase()
+    try:
+        hashed_password = get_password_hash(new_password)
+        result = supabase.table("users").update({
+            "hashed_password": hashed_password,
+            "updated_at": datetime.utcnow().isoformat()
+        }).eq("id", user_id).execute()
+        return result.data is not None and len(result.data) > 0
+    except Exception as e:
+        print(f"Error updating password: {e}")
+        return False

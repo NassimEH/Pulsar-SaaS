@@ -30,6 +30,11 @@ class UserResponse(BaseModel):
     plan: str
     is_active: bool
     is_verified: bool
+    avatar_url: Optional[str] = None
+    bio: Optional[str] = None
+    phone: Optional[str] = None
+    location: Optional[str] = None
+    website: Optional[str] = None
     
     @classmethod
     def from_orm(cls, obj):
@@ -40,11 +45,28 @@ class UserResponse(BaseModel):
             full_name=obj.full_name,
             plan=obj.plan.value if hasattr(obj.plan, 'value') else str(obj.plan),
             is_active=obj.is_active,
-            is_verified=obj.is_verified
+            is_verified=obj.is_verified,
+            avatar_url=getattr(obj, 'avatar_url', None),
+            bio=getattr(obj, 'bio', None),
+            phone=getattr(obj, 'phone', None),
+            location=getattr(obj, 'location', None),
+            website=getattr(obj, 'website', None)
         )
     
     class Config:
         from_attributes = True
+
+class UserUpdate(BaseModel):
+    full_name: Optional[str] = None
+    bio: Optional[str] = None
+    phone: Optional[str] = None
+    location: Optional[str] = None
+    website: Optional[str] = None
+    avatar_url: Optional[str] = None
+
+class PasswordChange(BaseModel):
+    old_password: str
+    new_password: str
 
 class AnalysisResponse(BaseModel):
     filename: str

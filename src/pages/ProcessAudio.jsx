@@ -214,7 +214,7 @@ const ProcessAudio = () => {
             id: "compare",
             title: "Comparaison avec référence",
             description: "Comparez votre mix avec une référence professionnelle.",
-            icon: "📊",
+            icon: null,
             backgroundUrl: "./src/assets/benefits/card-5.svg",
             isNavigation: true, // À développer plus tard
         },
