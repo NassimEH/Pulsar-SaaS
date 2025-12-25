@@ -10,6 +10,7 @@ import { Gradient } from "../components/design/Services";
 import { GradientLight } from "../components/design/Benefits";
 import ClipPath from "../assets/svg/ClipPath";
 import { formatKeyWithMinor } from "../utils/keyUtils";
+import AudioStatsRealtime from "../components/AudioStatsRealtime";
 
 const ProcessAudio = () => {
     const navigate = useNavigate();
@@ -22,6 +23,7 @@ const ProcessAudio = () => {
     const [downloadUrl, setDownloadUrl] = useState("");
     const [isPlaying, setIsPlaying] = useState(false);
     const [loadingAnalysis, setLoadingAnalysis] = useState(false);
+    const [audioContext, setAudioContext] = useState(null);
 
     useEffect(() => {
         // Essayer d'abord location.state, puis localStorage
@@ -62,7 +64,11 @@ const ProcessAudio = () => {
             if (wavesurfer.current) {
                 try {
                     // Détacher tous les événements
-                    wavesurfer.current.unAll();
+                    try {
+                        wavesurfer.current.unAll();
+                    } catch (e) {
+                        // Ignorer les erreurs de unAll
+                    }
                     // Arrêter la lecture si en cours
                     try {
                         if (wavesurfer.current.isPlaying && wavesurfer.current.isPlaying()) {
@@ -72,12 +78,14 @@ const ProcessAudio = () => {
                         // Ignorer si pause échoue
                     }
                     // Détruire l'instance
-                    wavesurfer.current.destroy();
-                } catch (error) {
-                    // Ignorer les erreurs de destruction, notamment les AbortError
-                    if (error.name !== 'AbortError' && error.message !== 'signal is aborted without reason') {
-                        console.log('WaveSurfer cleanup:', error.message);
+                    try {
+                        wavesurfer.current.destroy();
+                    } catch (error) {
+                        // Ignorer toutes les erreurs de destruction (AbortError est normal)
+                        // Ne pas logger pour éviter le spam dans la console
                     }
+                } catch (error) {
+                    // Ignorer toutes les erreurs de cleanup
                 } finally {
                     wavesurfer.current = null;
                 }
@@ -90,8 +98,6 @@ const ProcessAudio = () => {
             // Nettoyer l'instance précédente de manière sécurisée
             if (wavesurfer.current) {
                 try {
-                    // Détacher les événements avant de détruire
-                    wavesurfer.current.unAll();
                     // Arrêter la lecture si en cours
                     try {
                         if (wavesurfer.current.isPlaying && wavesurfer.current.isPlaying()) {
@@ -100,15 +106,28 @@ const ProcessAudio = () => {
                     } catch (e) {
                         // Ignorer si pause échoue
                     }
-                    // Détruire l'instance
-                    wavesurfer.current.destroy();
-                } catch (error) {
-                    // Ignorer les erreurs de destruction (déjà détruit ou en cours)
-                    // Ne pas logger les AbortError qui sont normales lors de la destruction
-                    if (error.name !== 'AbortError' && error.message !== 'signal is aborted without reason') {
-                        console.log('WaveSurfer cleanup:', error.message);
+                    // Détacher tous les événements AVANT de détruire
+                    try {
+                        wavesurfer.current.unAll();
+                    } catch (e) {
+                        // Ignorer les erreurs de unAll
                     }
-                } finally {
+                    // Détruire l'instance avec un délai pour éviter les conflits
+                    const oldInstance = wavesurfer.current;
+                    wavesurfer.current = null; // Déjà null pour éviter les références
+                    
+                    setTimeout(() => {
+                        try {
+                            if (oldInstance && typeof oldInstance.destroy === 'function') {
+                                oldInstance.destroy();
+                            }
+                        } catch (error) {
+                            // Ignorer TOUTES les erreurs de destruction (AbortError est normal)
+                            // Ne pas logger pour éviter le spam
+                        }
+                    }, 100);
+                } catch (error) {
+                    // Ignorer toutes les erreurs de cleanup
                     wavesurfer.current = null;
                 }
             }
@@ -127,18 +146,66 @@ const ProcessAudio = () => {
                     barGap: 2,
                     responsive: true,
                     normalize: true,
+                    backend: 'WebAudio', // Forcer l'utilisation de WebAudio pour avoir l'audioContext
                 });
 
                 const url = URL.createObjectURL(audioFile);
-                wavesurfer.current.load(url);
+                
+                // Gérer les erreurs de chargement (ignorer les AbortError qui sont normaux)
+                wavesurfer.current.on('error', (error) => {
+                    // Ignorer les AbortError qui sont normaux lors du cleanup
+                    if (error.name !== 'AbortError' && !error.message?.includes('aborted')) {
+                        console.warn('WaveSurfer error:', error);
+                    }
+                });
+
+                try {
+                    wavesurfer.current.load(url);
+                } catch (error) {
+                    // Ignorer les AbortError lors du chargement
+                    if (error.name !== 'AbortError' && !error.message?.includes('aborted')) {
+                        console.error('Error loading audio:', error);
+                    }
+                    URL.revokeObjectURL(url);
+                }
 
                 wavesurfer.current.on('play', () => setIsPlaying(true));
                 wavesurfer.current.on('pause', () => setIsPlaying(false));
                 wavesurfer.current.on('finish', () => setIsPlaying(false));
                 
-                // Nettoyer l'URL après le chargement
+                // Nettoyer l'URL après le chargement et configurer l'audio context
                 wavesurfer.current.on('ready', () => {
-                    URL.revokeObjectURL(url);
+                    try {
+                        URL.revokeObjectURL(url);
+                    } catch (e) {
+                        // Ignorer les erreurs de révocation
+                    }
+                    // Récupérer l'audio context depuis WaveSurfer
+                    setTimeout(() => {
+                        if (wavesurfer.current && wavesurfer.current.backend) {
+                            // Essayer plusieurs chemins pour trouver l'audioContext
+                            const ac = wavesurfer.current.backend.ac || 
+                                      wavesurfer.current.backend.audioContext ||
+                                      (wavesurfer.current.backend.getAudioContext && wavesurfer.current.backend.getAudioContext());
+
+                            if (ac) {
+                                setAudioContext(ac);
+                                console.log('✅ AudioContext récupéré depuis WaveSurfer');
+                            } else {
+                                // Fallback : créer un AudioContext
+                                try {
+                                    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+                                    if (AudioContextClass) {
+                                        const newContext = new AudioContextClass();
+                                        setAudioContext(newContext);
+                                        console.log('✅ AudioContext créé en fallback');
+                                    }
+                                } catch (e) {
+                                    console.warn('⚠️ Impossible de créer AudioContext:', e);
+                                }
+                            }
+                        }
+                    }, 200);
                 });
             } catch (error) {
                 console.error('Error initializing WaveSurfer:', error);
@@ -424,6 +491,21 @@ const ProcessAudio = () => {
                                     </button>
                                 </div>
                                 <div ref={waveformRef} className="w-full mb-10" style={{ minHeight: '150px' }}></div>
+
+                                {/* Statistiques Audio en Temps Réel */}
+                                {wavesurfer.current && (
+                                    <div className="mb-10 pt-8 border-t border-n-6/30">
+                                        <div className="flex items-center gap-3 mb-6">
+                                            <div className="w-1 h-6 bg-gradient-to-b from-purple-400 to-pink-400 rounded-full"></div>
+                                            <h4 className="h5">Statistiques Audio en Temps Réel</h4>
+                                        </div>
+                                        <AudioStatsRealtime 
+                                            audioContext={audioContext}
+                                            audioSource={wavesurfer.current}
+                                            isPlaying={isPlaying}
+                                        />
+                                    </div>
+                                )}
 
                                 {analysis && (
                                     <div className="pt-8 border-t border-n-6/30">
