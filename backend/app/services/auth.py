@@ -3,9 +3,10 @@ from typing import Optional
 from pathlib import Path
 from jose import JWTError, jwt
 from passlib.context import CryptContext
-from sqlalchemy.orm import Session
+from supabase import Client
 from app.models.user import User, PlanType
 from app.core.config import settings
+from app.core.database import get_supabase
 import secrets
 import os
 import bcrypt
@@ -14,20 +15,21 @@ import bcrypt
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 # Configuration JWT
-# En production, utiliser une variable d'environnement
-# Pour le développement, on génère une clé persistante pour éviter les problèmes de redémarrage
-SECRET_KEY_FILE = Path(__file__).parent.parent.parent / ".secret_key"
-
-def _get_or_create_secret_key():
-    """Récupère ou crée une clé secrète persistante"""
+# Utiliser la SECRET_KEY depuis les settings (chargée depuis .env)
+if settings.SECRET_KEY:
+    SECRET_KEY = settings.SECRET_KEY
+    print("✅ SECRET_KEY chargée depuis les variables d'environnement")
+else:
+    # Fallback pour le développement local
+    SECRET_KEY_FILE = Path(__file__).resolve().parent.parent.parent.parent / ".secret_key"
     if SECRET_KEY_FILE.exists():
-        return SECRET_KEY_FILE.read_text().strip()
+        SECRET_KEY = SECRET_KEY_FILE.read_text().strip()
+        print("⚠️  SECRET_KEY chargée depuis le fichier local (.secret_key)")
     else:
-        key = os.getenv("SECRET_KEY", secrets.token_urlsafe(32))
-        SECRET_KEY_FILE.write_text(key)
-        return key
+        SECRET_KEY = secrets.token_urlsafe(32)
+        SECRET_KEY_FILE.write_text(SECRET_KEY)
+        print("⚠️  SECRET_KEY générée et sauvegardée localement (développement uniquement)")
 
-SECRET_KEY = _get_or_create_secret_key()
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7  # 7 jours
 
@@ -40,11 +42,8 @@ def _truncate_password(password: str) -> bytes:
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """Vérifie un mot de passe en clair contre un hash"""
-    # Tronquer le mot de passe à 72 bytes pour la vérification
     password_bytes = _truncate_password(plain_password)
-    # Utiliser bcrypt directement pour éviter la vérification de longueur de passlib
     try:
-        # Le hash peut être déjà une string ou bytes
         if isinstance(hashed_password, str):
             hashed_bytes = hashed_password.encode('utf-8')
         else:
@@ -54,7 +53,6 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
         return result
     except Exception as e:
         print(f"bcrypt checkpw failed: {e}, trying passlib fallback")
-        # Fallback sur passlib si bcrypt échoue
         try:
             return pwd_context.verify(plain_password, hashed_password)
         except Exception as e2:
@@ -63,10 +61,7 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 
 def get_password_hash(password: str) -> str:
     """Hash un mot de passe"""
-    # bcrypt a une limitation de 72 bytes, on tronque si nécessaire
-    # Utiliser bcrypt directement pour éviter la vérification de longueur de passlib
     password_bytes = _truncate_password(password)
-    # Générer le salt et hasher
     salt = bcrypt.gensalt()
     hashed = bcrypt.hashpw(password_bytes, salt)
     return hashed.decode('utf-8')
@@ -74,6 +69,9 @@ def get_password_hash(password: str) -> str:
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     """Crée un token JWT"""
     to_encode = data.copy()
+    # S'assurer que 'sub' est une string (requis par JWT)
+    if "sub" in to_encode and not isinstance(to_encode["sub"], str):
+        to_encode["sub"] = str(to_encode["sub"])
     if expires_delta:
         expire = datetime.utcnow() + expires_delta
     else:
@@ -101,32 +99,81 @@ def verify_token(token: str) -> Optional[dict]:
         traceback.print_exc()
         return None
 
-def get_user_by_email(db: Session, email: str) -> Optional[User]:
-    """Récupère un utilisateur par son email"""
-    return db.query(User).filter(User.email == email).first()
+def get_user_by_email(email: str) -> Optional[User]:
+    """Récupère un utilisateur par son email depuis Supabase"""
+    supabase = get_supabase()
+    try:
+        result = supabase.table("users").select("*").eq("email", email).limit(1).execute()
+        if result.data and len(result.data) > 0:
+            return User.from_dict(result.data[0])
+        return None
+    except Exception as e:
+        print(f"Error fetching user by email: {e}")
+        return None
 
-def get_user_by_id(db: Session, user_id: int) -> Optional[User]:
-    """Récupère un utilisateur par son ID"""
-    return db.query(User).filter(User.id == user_id).first()
+def get_user_by_id(user_id: int) -> Optional[User]:
+    """Récupère un utilisateur par son ID depuis Supabase"""
+    supabase = get_supabase()
+    try:
+        print(f"Fetching user with ID: {user_id} (type: {type(user_id)})")
+        result = supabase.table("users").select("*").eq("id", user_id).limit(1).execute()
+        print(f"Supabase query result: {result}")
+        print(f"Result data: {result.data}")
+        if result.data and len(result.data) > 0:
+            print(f"User found: {result.data[0]}")
+            return User.from_dict(result.data[0])
+        print(f"No user found with ID: {user_id}")
+        return None
+    except Exception as e:
+        print(f"Error fetching user by id: {e}")
+        import traceback
+        traceback.print_exc()
+        return None
 
-def create_user(db: Session, email: str, password: str, full_name: Optional[str] = None) -> User:
-    """Crée un nouvel utilisateur"""
+def create_user(email: str, password: str, full_name: Optional[str] = None) -> User:
+    """Crée un nouvel utilisateur dans Supabase"""
+    supabase = get_supabase()
     hashed_password = get_password_hash(password)
-    db_user = User(
-        email=email,
-        hashed_password=hashed_password,
-        full_name=full_name,
-        plan=PlanType.FREE
-    )
-    db.add(db_user)
-    db.commit()
-    db.refresh(db_user)
-    return db_user
+    
+    user_data = {
+        "email": email,
+        "hashed_password": hashed_password,
+        "full_name": full_name,
+        "plan": PlanType.FREE.value,
+        "is_active": True,
+        "is_verified": False
+    }
+    
+    try:
+        print(f"Attempting to insert user with email: {email}")
+        result = supabase.table("users").insert(user_data).execute()
+        print(f"Insert result: {result}")
+        if result.data and len(result.data) > 0:
+            print(f"User created successfully: {result.data[0]}")
+            return User.from_dict(result.data[0])
+        raise Exception("No data returned from insert")
+    except Exception as e:
+        error_msg = str(e)
+        print(f"Error creating user: {error_msg}")
+        # Afficher plus de détails sur l'erreur
+        if hasattr(e, 'args') and e.args:
+            print(f"Error args: {e.args}")
+        if hasattr(e, 'message'):
+            print(f"Error message: {e.message}")
+        # Si c'est une erreur Supabase/PostgREST, donner plus de contexte
+        if "PGRST" in error_msg or "permission" in error_msg.lower() or "row-level security" in error_msg.lower():
+            raise Exception(
+                f"Erreur de permissions Supabase. Vérifiez que:\n"
+                f"1. RLS est désactivé sur la table users (ALTER TABLE users DISABLE ROW LEVEL SECURITY)\n"
+                f"2. Vous utilisez la clé service_role (pas anon) dans SUPABASE_KEY\n"
+                f"Erreur: {error_msg}"
+            )
+        raise
 
-def authenticate_user(db: Session, email: str, password: str) -> Optional[User]:
+def authenticate_user(email: str, password: str) -> Optional[User]:
     """Authentifie un utilisateur"""
     print(f"Authenticating user: {email}")
-    user = get_user_by_email(db, email)
+    user = get_user_by_email(email)
     if not user:
         print(f"User not found: {email}")
         return None
@@ -140,4 +187,3 @@ def authenticate_user(db: Session, email: str, password: str) -> Optional[User]:
         return None
     print(f"User authenticated successfully: {email}")
     return user
-

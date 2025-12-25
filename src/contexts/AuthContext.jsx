@@ -27,9 +27,12 @@ export const AuthProvider = ({ children }) => {
     }
     
     try {
+      const cleanToken = currentToken.trim();
       const response = await fetch(`${API_URL}/api/auth/me`, {
         headers: {
-          'Authorization': `Bearer ${currentToken}`
+          'Authorization': `Bearer ${cleanToken}`,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
         }
       });
       
@@ -38,6 +41,7 @@ export const AuthProvider = ({ children }) => {
         setUser(userData);
       } else {
         // Token invalide, supprimer
+        console.log('Token invalid, logging out. Status:', response.status);
         logout();
       }
     } catch (error) {
@@ -82,27 +86,44 @@ export const AuthProvider = ({ children }) => {
       
       // Récupérer les infos utilisateur avec le nouveau token (sans attendre useEffect)
       console.log('Fetching user info with token:', newToken.substring(0, 20) + '...');
+      console.log('Token length:', newToken.length);
+      
+      // S'assurer que le token est bien formaté (pas d'espaces)
+      const cleanToken = newToken.trim();
+      
       const userResponse = await fetch(`${API_URL}/api/auth/me`, {
         method: 'GET',
         headers: {
-          'Authorization': `Bearer ${newToken}`,
-          'Content-Type': 'application/json'
-        },
-        credentials: 'include'
+          'Authorization': `Bearer ${cleanToken}`,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        }
       });
+      
       console.log('User response status:', userResponse.status);
+      console.log('User response headers:', Object.fromEntries(userResponse.headers.entries()));
       
       if (userResponse.ok) {
         const userData = await userResponse.json();
+        console.log('User data received:', userData);
         setUser(userData);
         return { success: true };
       } else {
-        // Si erreur, nettoyer
-        const errorText = await userResponse.text();
-        console.error('Error fetching user info after login:', errorText);
+        // Si erreur, nettoyer et obtenir le détail de l'erreur
+        let errorDetail = 'Erreur inconnue';
+        try {
+          const errorData = await userResponse.json();
+          errorDetail = errorData.detail || errorData.message || errorDetail;
+          console.error('Error response data:', errorData);
+        } catch (e) {
+          const errorText = await userResponse.text();
+          errorDetail = errorText || errorDetail;
+          console.error('Error response text:', errorText);
+        }
+        console.error('Error fetching user info after login:', errorDetail);
         localStorage.removeItem('auth_token');
         setToken(null);
-        throw new Error('Impossible de récupérer les informations utilisateur');
+        throw new Error(`Impossible de récupérer les informations utilisateur: ${errorDetail}`);
       }
     } catch (error) {
       console.error('Login error:', error);
